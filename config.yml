@@ -1,6 +1,6 @@
-port: 4000
+port: 80
 hosts:
   "l.j-k.one":
-    port: 80
+    port: 81
     ip: "127.0.0.1"
     protocol: "http"

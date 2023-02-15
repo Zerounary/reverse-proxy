@@ -76,11 +76,11 @@ async fn proxy_reqs(
                     Ok(res)
                 },
                 None => {
-                    Err((StatusCode::FAILED_DEPENDENCY, "Unkown HOST in the header".to_string()))
+                    Err((StatusCode::FAILED_DEPENDENCY, "Unkown `Host` in the headers".to_string()))
                 },
             }
         }else {
-            Err((StatusCode::FAILED_DEPENDENCY, "The HOST does not exist in the header".to_string()))
+            Err((StatusCode::FAILED_DEPENDENCY, "The `Host` does not exist in the headers".to_string()))
         }
 
 }
