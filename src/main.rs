@@ -1,8 +1,6 @@
 use axum::{
-    extract::{Extension, FromRequest, RequestParts},
-    http::{uri::Uri, Request, Response},
-    routing::get,
-    Router, middleware::{self, Next}, async_trait, response::IntoResponse,
+    http::{uri::Uri, Request, },
+    Router, middleware::{self, Next}, response::IntoResponse,
 };
 use hyper::{client::HttpConnector, Body, StatusCode};
 use std::net::SocketAddr;
@@ -14,8 +12,9 @@ async fn main() {
     let client = Client::new();
 
     let app = Router::new()
-        .layer(middleware::from_fn(proxy_reqs))
-        .layer(Extension(client));
+        .layer(middleware::from_fn(move |req, next| {
+            proxy_reqs(req, next, client.clone())
+        }));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 4000));
     println!("reverse proxy listening on {}", addr);
@@ -27,7 +26,8 @@ async fn main() {
 
 async fn proxy_reqs(
     mut req: Request<Body>,
-    next: Next<Body>,
+    _next: Next<Body>,
+    client: Client
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
         let path = req.uri().path();
         let path_query = req
@@ -38,7 +38,6 @@ async fn proxy_reqs(
 
         let uri = format!("http://127.0.0.1:80{}", path_query);
         *req.uri_mut() = Uri::try_from(uri).unwrap();
-        let client = Client::new();
         let res = client.request(req).await.unwrap();
         Ok(res)
 }
