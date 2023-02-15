@@ -9,3 +9,15 @@ edition = "2021"
 axum = { version = "0.5.15", features = ["headers"]}
 hyper = { version = "0.14", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "*"
+serde_yaml = "0.9.13"
+
+jsonpath-rust = "0.1.6"
+convert_case = "0.6.0"
+clap = {version = "3", features = ["derive"]}
+ansi_term = "0.12.1"
+
+pest = "2.0"
+pest_derive = "2.0"
