@@ -97,7 +97,11 @@ async fn proxy_https_reqs(
             .map(|v| v.as_str())
             .unwrap_or(path);
         
-        let host = req.uri().host();
+        let host = if let Some(header_host) = req.headers().get(HOST){
+            Some(header_host.to_str().unwrap())
+        }else {
+            req.uri().host()
+        };
 
         if let Some(host) = host {
             let host = host.to_string();
