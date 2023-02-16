@@ -35,8 +35,10 @@ async fn main() {
 
     let client = Client::new();
 
-    if config.ssl {
-        tokio::spawn(https_server(config.clone()));
+    if let Some(enable_ssl) = config.ssl {
+        if enable_ssl {
+            tokio::spawn(https_server(config.clone()));
+        }
     }
 
     let fn_config = config.clone();
@@ -44,12 +46,10 @@ async fn main() {
         .layer(middleware::from_fn(move |req, next| {
             proxy_http_reqs(req, next, client.clone(), fn_config.clone())
         }));
-    let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.port.unwrap_or(80)));
     println!("http reverse proxy listening on {}", addr);
     for (domain, host) in &config.hosts {
-        if host.protocol.to_lowercase().eq("http") {
-            log_proxy(&format!("http://{}", &domain), &host.protocol, &host.ip, &host.port.to_string());
-        }
+        log_proxy(&format!("http://{}", &domain), &host.ip, &host.port.to_string());
     }
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -65,18 +65,18 @@ async fn https_server(config: Config) {
         .layer(middleware::from_fn(move |req, next| {
             proxy_https_reqs(req, next, client.clone(), fn_config.clone())
         }));
-    let addr = SocketAddr::from(([0, 0, 0, 0], config.ssl_port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.ssl_port.unwrap_or(443)));
     
     let ssl_cfg = RustlsConfig::from_pem_file(
-        PathBuf::from(config.ssl_cert_file), 
-        PathBuf::from(config.ssl_key_file), 
+        PathBuf::from(config.ssl_cert_file.unwrap_or("./ssl/certificate.crt".to_string())), 
+        PathBuf::from(config.ssl_key_file.unwrap_or("./ssl/private.pem".to_string())), 
     )
     .await
     .unwrap();
 
     println!("https reverse proxy listening on {}", addr);
     for (domain, host) in &config.hosts {
-        log_proxy(&format!("https://{}", &domain), &host.protocol, &host.ip, &host.port.to_string());
+        log_proxy(&format!("https://{}", &domain), &host.ip, &host.port.to_string());
     }
     axum_server::bind_rustls(addr, ssl_cfg)
         .serve(app.into_make_service())
@@ -104,7 +104,7 @@ async fn proxy_https_reqs(
             let host_config = config.hosts.get(&host);
             match host_config {
                 Some(cfg) => {
-                    let uri = format!("{}://{}:{}{}", cfg.protocol, cfg.ip, cfg.port, path_query);
+                    let uri = format!("http://{}:{}{}", cfg.ip, cfg.port, path_query);
                     *req.uri_mut() = Uri::try_from(uri).unwrap();
                     *req.version_mut() = Version::HTTP_11;
                     let res = client.request(req).await.unwrap();
@@ -140,7 +140,7 @@ async fn proxy_http_reqs(
             let host_config = config.hosts.get(&host);
             match host_config {
                 Some(cfg) => {
-                    let uri = format!("{}://{}:{}{}", cfg.protocol, cfg.ip, cfg.port, path_query);
+                    let uri = format!("http://{}:{}{}", cfg.ip, cfg.port, path_query);
                     *req.uri_mut() = Uri::try_from(uri).unwrap();
                     let res = client.request(req).await.unwrap();
                     Ok(res)

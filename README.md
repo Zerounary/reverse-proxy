@@ -43,8 +43,8 @@ hosts:
 port: 80
 ssl: true
 ssl_port: 443
-ssl_key_file: './ssl/key.pem'
-ssl_cert_file: './ssl/cert.pem'
+ssl_key_file: './ssl/certificate.crt'
+ssl_cert_file: './ssl/private.pem'
 hosts:
   "l.j-k.one":
     port: 81
@@ -52,3 +52,9 @@ hosts:
     protocol: "http"
 
 ```
+
+推荐几个免费的https证书申请地址[freessl](https://freessl.cn/)、[osfipin](https://letsencrypt.osfipin.com/)
+
+使用 `*.j-k.one` 泛域名的形式申请证书
+
+下载证书后，将`certificate.crt`、`private.pem`复制到ssl目录下即可
