@@ -5,9 +5,10 @@ use axum::{
     http::{uri::Uri, Request, },
     Router, middleware::{self, Next}, response::IntoResponse,
 };
+use axum_server::tls_rustls::RustlsConfig;
 use config::Config;
-use hyper::{client::HttpConnector, Body, StatusCode, header::HOST};
-use std::net::SocketAddr;
+use hyper::{client::HttpConnector, Body, StatusCode, header::HOST, Version};
+use std::{net::SocketAddr, path::PathBuf};
 use clap::{Parser};
 
 use crate::{config::read_yaml_file, log::log_proxy};
@@ -34,15 +35,21 @@ async fn main() {
 
     let client = Client::new();
 
+    if config.ssl {
+        tokio::spawn(https_server(config.clone()));
+    }
+
     let fn_config = config.clone();
     let app = Router::new()
         .layer(middleware::from_fn(move |req, next| {
-            proxy_reqs(req, next, client.clone(), fn_config.clone())
+            proxy_http_reqs(req, next, client.clone(), fn_config.clone())
         }));
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
-    println!("reverse proxy listening on {}", addr);
+    println!("http reverse proxy listening on {}", addr);
     for (domain, host) in &config.hosts {
-        log_proxy(&domain, &host.protocol, &host.ip, &host.port.to_string());
+        if host.protocol.to_lowercase().eq("http") {
+            log_proxy(&format!("http://{}", &domain), &host.protocol, &host.ip, &host.port.to_string());
+        }
     }
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -50,7 +57,70 @@ async fn main() {
         .unwrap();
 }
 
-async fn proxy_reqs(
+async fn https_server(config: Config) {
+    let client = Client::new();
+
+    let fn_config = config.clone();
+    let app = Router::new()
+        .layer(middleware::from_fn(move |req, next| {
+            proxy_https_reqs(req, next, client.clone(), fn_config.clone())
+        }));
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.ssl_port));
+    
+    let ssl_cfg = RustlsConfig::from_pem_file(
+        PathBuf::from(config.ssl_cert_file), 
+        PathBuf::from(config.ssl_key_file), 
+    )
+    .await
+    .unwrap();
+
+    println!("https reverse proxy listening on {}", addr);
+    for (domain, host) in &config.hosts {
+        log_proxy(&format!("https://{}", &domain), &host.protocol, &host.ip, &host.port.to_string());
+    }
+    axum_server::bind_rustls(addr, ssl_cfg)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
+
+async fn proxy_https_reqs(
+    mut req: Request<Body>,
+    _next: Next<Body>,
+    client: Client,
+    config: Config
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+        let path = req.uri().path();
+        let path_query = req
+            .uri()
+            .path_and_query()
+            .map(|v| v.as_str())
+            .unwrap_or(path);
+        
+        let host = req.uri().host();
+
+        if let Some(host) = host {
+            let host = host.to_string();
+            let host_config = config.hosts.get(&host);
+            match host_config {
+                Some(cfg) => {
+                    let uri = format!("{}://{}:{}{}", cfg.protocol, cfg.ip, cfg.port, path_query);
+                    *req.uri_mut() = Uri::try_from(uri).unwrap();
+                    *req.version_mut() = Version::HTTP_11;
+                    let res = client.request(req).await.unwrap();
+                    Ok(res)
+                },
+                None => {
+                    Err((StatusCode::FAILED_DEPENDENCY, "Unkown `Host` in the headers".to_string()))
+                },
+            }
+        }else {
+            Err((StatusCode::FAILED_DEPENDENCY, "The `Host` does not exist in the headers".to_string()))
+        }
+
+}
+
+async fn proxy_http_reqs(
     mut req: Request<Body>,
     _next: Next<Body>,
     client: Client,

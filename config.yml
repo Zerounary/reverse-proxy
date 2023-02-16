@@ -1,4 +1,8 @@
 port: 80
+ssl: true
+ssl_port: 443
+ssl_key_file: './ssl/key.pem'
+ssl_cert_file: './ssl/cert.pem'
 hosts:
   "l.j-k.one":
     port: 81
