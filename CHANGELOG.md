@@ -18,6 +18,6 @@ Note: In this file, do not use the hard wrap in the middle of a sentence for com
 
 - 支持对外提供 https
 
-## [0.0.2] - 2023-02-16
+## [0.0.3] - 2023-02-16
 
 - 简化 https 配置
