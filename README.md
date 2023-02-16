@@ -26,15 +26,16 @@ hosts:
   "l.j-k.one":
     port: 81
     ip: "127.0.0.1"
-    protocol: "http"
 ```
 `port`是反向代理服务器的端口，`hosts`记录个每个域名所代理的内网环境。
 
-每一个`host`有以下结构
+|字段| 必填 | 默认值 | 说明 |
+| ---   | ---  | ---     | --- |
+| port   |  否  | 80|  HTTP反向代理的端口  |
+| hosts   |  否  ||  反向代理的域名详情  |
+| hosts.port   |  是  ||  目标端口  |
+| hosts.ip   |  是  ||  目标IP  |
 
-`ip`：目标IP
-`port`：目标端口
-`protocol`：代理的协议
 
 ## https
 
@@ -49,9 +50,14 @@ hosts:
   "l.j-k.one":
     port: 81
     ip: "127.0.0.1"
-    protocol: "http"
-
 ```
+
+|字段| 必填 | 默认值 | 说明 |
+| ---   | ---  | ---     | --- |
+| ssl   |  否  | false|  是否启用https  |
+| ssl_port   |  否  |443|  https端口  |
+| ssl_key_file   |  否  | ./ssl/private.pem|  证书私钥  |
+| ssl_cert_file   |  否  | ./ssl/certificate.crt|  证书certificate  |
 
 推荐几个免费的https证书申请地址[freessl](https://freessl.cn/)、[osfipin](https://letsencrypt.osfipin.com/)
 
