@@ -13,3 +13,7 @@ Note: In this file, do not use the hard wrap in the middle of a sentence for com
 ## [0.0.1] - 2023-02-15
 
 - 初步版本 简单实现 还未优化
+
+## [0.0.2] - 2023-02-16
+
+- 支持对外提供 https

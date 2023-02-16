@@ -5,7 +5,7 @@
 # 功能
 
 [ √ ] 根据配置文件，自动反向代理域名到目标地址
-[ × ] 支持免费Https，并自动续期
+[ √ ] 支持免费Https，并自动续期
 [ × ] 支持 DNS 接口，自动绑定域名IP
 
 # 性能
@@ -33,3 +33,20 @@ hosts:
 `ip`：目标IP
 `port`：目标端口
 `protocol`：代理的协议
+
+## https
+
+使用以下配置
+```yaml
+port: 80
+ssl: true
+ssl_port: 443
+ssl_key_file: './ssl/key.pem'
+ssl_cert_file: './ssl/cert.pem'
+hosts:
+  "l.j-k.one":
+    port: 81
+    ip: "127.0.0.1"
+    protocol: "http"
+
+```
