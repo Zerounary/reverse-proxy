@@ -21,3 +21,7 @@ Note: In this file, do not use the hard wrap in the middle of a sentence for com
 ## [0.0.3] - 2023-02-16
 
 - 简化 https 配置
+
+## [0.0.4] - 2023-02-16
+
+- 修复压测工具 https 代理失败问题
