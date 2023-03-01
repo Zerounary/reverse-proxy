@@ -1,7 +1,13 @@
 [package]
 name = "reverse-proxy"
-version = "0.1.0"
+version = "0.0.4"
 edition = "2021"
+description = "A high-performance HTTP reverse proxy server"
+authors = ["Zerounary <gmail_ilak@163.com>"]
+license = "MIT"
+keywords = ["server", "axum", "reverse",  "proxy"]
+repository = "https://github.com/Zerounary/reverse-proxy.git"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
