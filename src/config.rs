@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, collections::HashMap,};
+use std::{collections::HashMap, fs};
+use validator::{Validate, ValidationError};
 
 type Port = u16;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone,)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Validate)]
 pub struct Config {
     pub port: Option<Port>,
     pub ssl: Option<bool>,
@@ -13,16 +14,16 @@ pub struct Config {
     pub hosts: HashMap<String, Host>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone,)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Validate)]
 pub struct Host {
     pub ip: String,
     pub port: Port,
+    #[validate(custom(function = "protocol_check"))]
     pub protocol: String,
 }
 
 pub fn read_yaml_file(yaml_path: &str) -> Config {
-    let yaml_content =
-        fs::read_to_string(yaml_path).ok().unwrap_or_default();
+    let yaml_content = fs::read_to_string(yaml_path).ok().unwrap_or_default();
     let result: Config = serde_yaml::from_str(&yaml_content).ok().unwrap_or(Config {
         port: Some(80),
         ssl_port: Some(443),
@@ -31,5 +32,26 @@ pub fn read_yaml_file(yaml_path: &str) -> Config {
         ssl_key_file: Some(String::from("./ssl/private.pem")),
         ssl_cert_file: Some(String::from("./ssl/certificate.crt")),
     });
-    result
+    match result.validate() {
+        Ok(_) => {
+            for host in result.hosts.values() {
+                match host.validate() {
+                    Err(e) => panic!("{}", e),
+                    _ => (),
+                }
+            }
+            return result;
+        }
+        Err(e) => panic!("{}", e),
+    }
+}
+
+pub fn protocol_check(value: &str) -> Result<(), ValidationError> {
+    if vec!["http", "https"].contains(&value) {
+        Ok(())
+    } else {
+        Err(ValidationError::new(
+            "protocol only support 'http' or 'https'",
+        ))
+    }
 }

@@ -3,7 +3,7 @@ hosts:
   "l.j-k.one":
     port: 5500
     ip: "127.0.0.1"
-    protocol: "http"
+    protocol: "httpx"
   "l0.j-k.one":
     port: 443
     ip: "www.baidu.com"
