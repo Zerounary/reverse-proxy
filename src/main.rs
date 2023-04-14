@@ -52,7 +52,7 @@ async fn main() {
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port.unwrap_or(80)));
     println!("http reverse proxy listening on {}", addr);
     for (domain, host) in &config.hosts {
-        log_proxy(&format!("http://{}", &domain), &host.ip, &host.port.to_string());
+        log_proxy(&format!("http://{}", &domain), &host.protocol, &host.ip, &host.port.to_string());
     }
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -80,7 +80,7 @@ async fn https_server(config: Config) {
 
     println!("https reverse proxy listening on {}", addr);
     for (domain, host) in &config.hosts {
-        log_proxy(&format!("https://{}", &domain), &host.ip, &host.port.to_string());
+        log_proxy(&format!("https://{}", &domain), &host.protocol, &host.ip, &host.port.to_string());
     }
     axum_server::bind_rustls(addr, ssl_cfg)
         .serve(app.into_make_service())
