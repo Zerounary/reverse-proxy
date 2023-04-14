@@ -8,13 +8,15 @@ use axum::{
 use axum_server::tls_rustls::RustlsConfig;
 use config::Config;
 use hyper::{client::HttpConnector, Body, StatusCode, header::HOST, Version};
+use hyper::Client;
+use hyper_tls::HttpsConnector;
 use std::{net::SocketAddr, path::PathBuf};
 use clap::{Parser};
 
 use crate::{config::read_yaml_file, log::log_proxy};
 
-type Client = hyper::client::Client<HttpConnector, Body>;
-
+type HttpClient = hyper::client::Client<HttpConnector, Body>;
+type HttpsClient = Client<HttpsConnector<HttpConnector>>;
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
@@ -33,7 +35,8 @@ async fn main() {
 
     let config = read_yaml_file(&yaml_path);
 
-    let client = Client::new();
+    let httpclient = Client::new();
+    let httpsclient = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
 
     if let Some(enable_ssl) = config.ssl {
         if enable_ssl {
@@ -44,7 +47,7 @@ async fn main() {
     let fn_config = config.clone();
     let app = Router::new()
         .layer(middleware::from_fn(move |req, next| {
-            proxy_http_reqs(req, next, client.clone(), fn_config.clone())
+            proxy_http_reqs(req, next, httpclient.clone(), httpsclient.clone(), fn_config.clone())
         }));
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port.unwrap_or(80)));
     println!("http reverse proxy listening on {}", addr);
@@ -58,12 +61,13 @@ async fn main() {
 }
 
 async fn https_server(config: Config) {
-    let client = Client::new();
+    let httpclient = Client::new();
+    let httpsclient = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
 
     let fn_config = config.clone();
     let app = Router::new()
         .layer(middleware::from_fn(move |req, next| {
-            proxy_https_reqs(req, next, client.clone(), fn_config.clone())
+            proxy_https_reqs(req, next, httpclient.clone(), httpsclient.clone(), fn_config.clone())
         }));
     let addr = SocketAddr::from(([0, 0, 0, 0], config.ssl_port.unwrap_or(443)));
     
@@ -87,7 +91,8 @@ async fn https_server(config: Config) {
 async fn proxy_https_reqs(
     mut req: Request<Body>,
     _next: Next<Body>,
-    client: Client,
+    httpclient: HttpClient,
+    httpsclient: HttpsClient,
     config: Config
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
         let path = req.uri().path();
@@ -108,10 +113,13 @@ async fn proxy_https_reqs(
             let host_config = config.hosts.get(&host);
             match host_config {
                 Some(cfg) => {
-                    let uri = format!("http://{}:{}{}", cfg.ip, cfg.port, path_query);
+                    let uri = format!("{}://{}:{}{}", cfg.protocol, cfg.ip, cfg.port, path_query);
                     *req.uri_mut() = Uri::try_from(uri).unwrap();
                     *req.version_mut() = Version::HTTP_11;
-                    let res = client.request(req).await.unwrap();
+                    let res = match cfg.protocol.as_str() {
+                        "https" => httpsclient.request(req).await.unwrap(),
+                        _ =>  httpclient.request(req).await.unwrap(),
+                    };
                     Ok(res)
                 },
                 None => {
@@ -127,7 +135,8 @@ async fn proxy_https_reqs(
 async fn proxy_http_reqs(
     mut req: Request<Body>,
     _next: Next<Body>,
-    client: Client,
+    httpclient: HttpClient,
+    httpsclient: HttpsClient,
     config: Config
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
         let path = req.uri().path();
@@ -144,9 +153,12 @@ async fn proxy_http_reqs(
             let host_config = config.hosts.get(&host);
             match host_config {
                 Some(cfg) => {
-                    let uri = format!("http://{}:{}{}", cfg.ip, cfg.port, path_query);
+                    let uri = format!("{}://{}:{}{}", cfg.protocol, cfg.ip, cfg.port, path_query);
                     *req.uri_mut() = Uri::try_from(uri).unwrap();
-                    let res = client.request(req).await.unwrap();
+                    let res = match cfg.protocol.as_str() {
+                        "https" => httpsclient.request(req).await.unwrap(),
+                        _ =>  httpclient.request(req).await.unwrap(),
+                    };
                     Ok(res)
                 },
                 None => {

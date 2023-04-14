@@ -39,7 +39,8 @@ hosts:
 | port   |  否  | 80|  HTTP反向代理的端口  |
 | hosts   |  否  ||  反向代理的域名详情  |
 | hosts.port   |  是  ||  目标端口  |
-| hosts.ip   |  是  ||  目标IP  |
+| hosts.ip   |  是  ||  目标IP或者域名  |
+| hosts.protocol   |  是  ||  目标的协议，支持 http/https  |
 
 
 ## https

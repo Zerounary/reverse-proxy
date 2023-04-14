@@ -17,6 +17,7 @@ pub struct Config {
 pub struct Host {
     pub ip: String,
     pub port: Port,
+    pub protocol: String,
 }
 
 pub fn read_yaml_file(yaml_path: &str) -> Config {
