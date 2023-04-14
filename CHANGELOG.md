@@ -25,3 +25,7 @@ Note: In this file, do not use the hard wrap in the middle of a sentence for com
 ## [0.0.4] - 2023-02-16
 
 - 修复压测工具 https 代理失败问题
+
+## [0.0.5] - 2023-04-14
+
+- 支持网站转发
