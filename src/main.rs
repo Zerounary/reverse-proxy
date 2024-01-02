@@ -153,7 +153,7 @@ async fn proxy_http_reqs(
         };
 
         if let Some(host) = host {
-            let host = host.to_str().unwrap().to_string();
+            let host = host.to_string();
             let host_config = config.hosts.get(&host);
             match host_config {
                 Some(cfg) => {
