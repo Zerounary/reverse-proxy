@@ -29,3 +29,7 @@ Note: In this file, do not use the hard wrap in the middle of a sentence for com
 ## [0.0.5] - 2023-04-14
 
 - 支持网站转发
+
+## [0.0.6] - 2023-04-14
+
+- 修复 http  不支持路径自动识别转发问题
