@@ -146,7 +146,11 @@ async fn proxy_http_reqs(
             .map(|v| v.as_str())
             .unwrap_or(path);
         
-        let host = req.headers().get(HOST);
+        let host = if let Some(header_host) = req.headers().get(HOST){
+            Some(header_host.to_str().unwrap())
+        }else {
+            req.uri().host()
+        };
 
         if let Some(host) = host {
             let host = host.to_str().unwrap().to_string();
