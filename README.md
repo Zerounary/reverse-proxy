@@ -71,6 +71,8 @@ hosts:
 
 下载证书后，将`certificate.crt`、`private.pem`复制到ssl目录下即可
 
+## 阿里云获取
+
 如果是使用 阿里云 获取的免费证书，下载 Nginx （pem/key）的格式的证书 复制到ssl目录后参考以下配置
 
 ```yaml
@@ -83,4 +85,29 @@ hosts:
     port: 90
     ip: "127.0.0.1"
     protocol: "http"
+```
+
+但是阿里云的免费域名不支持泛域名
+
+## porkbun获取
+
+porkbun 可以免费生成的ssl证书，但前提是购买了他家的域名。
+
+进入域名管理，点开对应的域名详情，下面会有一个SSL，点击SSL旁边的编辑图标跳转拿到生成页面，点击revoke
+
+等待十几分钟后，回到页面就可以下载证书了。
+
+下载后使用类似下类配置
+
+```yaml
+ssl: true
+ssl_port: 443
+ssl_key_file: './ssl/private.key.pem'
+ssl_cert_file: './ssl/domain.cert.pem'
+hosts:
+  "l.j-k.one":
+    port: 90
+    ip: "127.0.0.1"
+    protocol: "http"
+
 ```
