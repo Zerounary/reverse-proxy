@@ -70,3 +70,17 @@ hosts:
 使用 `*.j-k.one` 泛域名的形式申请证书
 
 下载证书后，将`certificate.crt`、`private.pem`复制到ssl目录下即可
+
+如果是使用 阿里云 获取的免费证书，下载 Nginx （pem/key）的格式的证书 复制到ssl目录后参考以下配置
+
+```yaml
+ssl: true
+ssl_port: 443
+ssl_key_file: './ssl/l.j-k.one.key'
+ssl_cert_file: './ssl/l.j-k.one.pem'
+hosts:
+  "l.j-k.one":
+    port: 90
+    ip: "127.0.0.1"
+    protocol: "http"
+```

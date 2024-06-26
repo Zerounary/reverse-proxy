@@ -1,10 +1,9 @@
 ssl: true
+ssl_port: 443
+ssl_key_file: './ssl/l.j-k.one.key'
+ssl_cert_file: './ssl/l.j-k.one.pem'
 hosts:
   "l.j-k.one":
-    port: 5500
+    port: 90
     ip: "127.0.0.1"
-    protocol: "httpx"
-  "l0.j-k.one":
-    port: 443
-    ip: "www.baidu.com"
-    protocol: "https"
+    protocol: "http"
