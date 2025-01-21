@@ -197,7 +197,7 @@ async fn websocket_proxy(uri: String, req: Request<Body>) -> Response<Body> {
 
     // 代理转发
     ws.on_upgrade(|client| {
-        handle_socket(client)
+        handle_socket(client, uri)
     });
 
     Response::builder()
@@ -212,9 +212,9 @@ async fn websocket_proxy(uri: String, req: Request<Body>) -> Response<Body> {
         .unwrap()
 }
 
-async fn handle_socket(client: axum::extract::ws::WebSocket) {
+async fn handle_socket(client: axum::extract::ws::WebSocket, uri: String) {
     // 连接到目标 WebSocket 服务器
-    let (mut server_socket, _) = connect_async("ws://127.0.0.1:90/ws/connect")
+    let (mut server_socket, _) = connect_async(uri)
         .await
         .expect("Failed to connect to server");
 
