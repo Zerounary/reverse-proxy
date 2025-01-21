@@ -16,7 +16,7 @@ jobs:
           changelog: CHANGELOG.md
         env:
           # (required) GitHub token for creating GitHub Releases.
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   upload-assets:
     strategy:
@@ -36,4 +36,4 @@ jobs:
           zip: windows
         env:
           # (required) GitHub token for uploading assets to GitHub Releases.
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
