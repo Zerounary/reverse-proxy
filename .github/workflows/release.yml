@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: taiki-e/create-gh-release-action@v1.6.2
+      - uses: taiki-e/create-gh-release-action@v1.8.4
         with:
           # (optional) Path to changelog.
           changelog: CHANGELOG.md
@@ -28,7 +28,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
-      - uses: taiki-e/upload-rust-binary-action@v1.12.0
+      - uses: taiki-e/upload-rust-binary-action@v1.24.0
         with:
           # (required) Binary name (non-extension portion of filename) to build and upload.
           bin: reverse-proxy
