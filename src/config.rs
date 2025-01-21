@@ -47,11 +47,11 @@ pub fn read_yaml_file(yaml_path: &str) -> Config {
 }
 
 pub fn protocol_check(value: &str) -> Result<(), ValidationError> {
-    if vec!["http", "https"].contains(&value) {
+    if vec!["http", "https", "ws", "wss"].contains(&value) {
         Ok(())
     } else {
         Err(ValidationError::new(
-            "protocol only support 'http' or 'https'",
+            "protocol only support 'http', 'https', 'ws', 'wss'",
         ))
     }
 }
