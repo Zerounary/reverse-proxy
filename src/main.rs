@@ -312,9 +312,16 @@ async fn proxy_http_reqs(
         match host_config {
             Some(cfg) => {
                 let uri = format!("{}://{}:{}{}", cfg.protocol, cfg.ip, cfg.port, path_query);
-                *req.uri_mut() = Uri::try_from(uri).unwrap();
+                *req.uri_mut() = Uri::try_from(uri.clone()).unwrap();
                 let res = match cfg.protocol.as_str() {
                     "https" => httpsclient.request(req).await.unwrap(),
+                    "http" => {
+                        if (req.headers().get(header::UPGRADE) != None) {
+                            websocket_proxy(uri, req).await
+                        } else {
+                            httpclient.request(req).await.unwrap()
+                        }
+                    }
                     _ => httpclient.request(req).await.unwrap(),
                 };
                 Ok(res)
