@@ -16,8 +16,11 @@ use hyper::Client;
 use hyper::{client::HttpConnector, header, Body, StatusCode, Version};
 use hyper_tls::HttpsConnector;
 use std::{net::SocketAddr, path::PathBuf};
-use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::protocol::{frame::coding::CloseCode, CloseFrame},
+};
 
 use base64::encode;
 use sha1::{Digest, Sha1};
@@ -196,9 +199,7 @@ async fn websocket_proxy(uri: String, req: Request<Body>) -> Response<Body> {
     // 将WebSocket消息转换为HTTP响应体
 
     // 代理转发
-    ws.on_upgrade(|client| {
-        handle_socket(client, uri)
-    });
+    ws.on_upgrade(|client| handle_socket(client, uri));
 
     Response::builder()
         .status(101)
@@ -228,13 +229,58 @@ async fn handle_socket(client: axum::extract::ws::WebSocket, uri: String) {
         _ = async {
             while let Some(msg) = client_receiver.next().await {
                 let msg = msg.expect("Failed to receive message from client");
-                server_sender.send(Message::Text(msg.to_text().unwrap().to_string())).await.expect("Failed to send message to server");
+                match msg {
+                    axum::extract::ws::Message::Text(txt) => {
+                        server_sender.send(Message::Text(txt)).await.expect("Failed to send message to server");
+                    },
+                    axum::extract::ws::Message::Binary(vec) => {
+                        server_sender.send(Message::Binary(vec)).await.expect("Failed to send message to server");
+                    },
+                    axum::extract::ws::Message::Ping(vec) => {
+                        server_sender.send(Message::Ping(vec)).await.expect("Failed to send message to server");
+                    },
+                    axum::extract::ws::Message::Pong(vec) => {
+                        server_sender.send(Message::Pong(vec)).await.expect("Failed to send message to server");
+                    },
+                    axum::extract::ws::Message::Close(close_frame) => {
+                        let cf = close_frame.map(|c| {
+                            CloseFrame {
+                                code: CloseCode::from(c.code),
+                                reason: c.reason,
+                            }
+                        });
+                        server_sender.send(Message::Close(cf)).await.expect("Failed to send message to server");
+                    },
+                }
             }
         } => {}
         _ = async {
             while let Some(msg) = server_receiver.next().await {
                 let msg = msg.expect("Failed to receive message from server");
-                client_sender.send(axum::extract::ws::Message::Text(msg.to_string())).await.expect("Failed to send message to client");
+                use axum::extract::ws::Message::*;
+                match msg {
+                    Message::Text(txt) => {
+                        client_sender.send(Text(txt)).await.expect("Failed to send message to client");
+                    },
+                    Message::Binary(vec) => {
+                        client_sender.send(Binary(vec)).await.expect("Failed to send message to client");
+                    },
+                    Message::Ping(vec) => {
+                        client_sender.send(Ping(vec)).await.expect("Failed to send message to client");
+                    },
+                    Message::Pong(vec) => {
+                        client_sender.send(Pong(vec)).await.expect("Failed to send message to client");
+                    },
+                    Message::Close(close_frame) => {
+                        let cf = close_frame.map(|c| {
+                            axum::extract::ws::CloseFrame {
+                                code: c.code.into(),
+                                reason: c.reason
+                            }
+                        });
+                        client_sender.send(Close(cf)).await.expect("Failed to send message to client");
+                    },
+                }
             }
         } => {}
     }
