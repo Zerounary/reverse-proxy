@@ -1,5 +1,16 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::SystemTime,
+};
+use tokio::{
+    fs as tokio_fs,
+    sync::RwLock,
+    time::{sleep, Duration},
+};
 use validator::{Validate, ValidationError};
 
 type Port = u16;
@@ -21,6 +32,8 @@ pub struct Host {
     #[validate(custom(function = "protocol_check"))]
     pub protocol: String,
 }
+
+pub type SharedConfig = Arc<RwLock<Config>>;
 
 pub fn read_yaml_file(yaml_path: &str) -> Config {
     let yaml_content = fs::read_to_string(yaml_path).ok().unwrap_or_default();
@@ -54,4 +67,40 @@ pub fn protocol_check(value: &str) -> Result<(), ValidationError> {
             "protocol only support 'http', 'https', 'ws', 'wss'",
         ))
     }
+}
+
+pub fn spawn_hot_reload_task(path: PathBuf, shared_config: SharedConfig) {
+    tokio::spawn(async move {
+        let mut last_modified = file_modified_time(&path).await;
+
+        loop {
+            sleep(Duration::from_secs(1)).await;
+
+            let Some(current_modified) = file_modified_time(&path).await else {
+                continue;
+            };
+
+            let should_reload = match last_modified {
+                Some(previous) => current_modified != previous,
+                None => true,
+            };
+
+            if !should_reload {
+                continue;
+            }
+
+            let path_string = path.to_string_lossy().to_string();
+            let updated_config = read_yaml_file(&path_string);
+            {
+                let mut config_guard = shared_config.write().await;
+                *config_guard = updated_config;
+            }
+            last_modified = Some(current_modified);
+            println!("Config hot reloaded from {}", path_string);
+        }
+    });
+}
+
+async fn file_modified_time(path: &Path) -> Option<SystemTime> {
+    tokio_fs::metadata(path).await.ok()?.modified().ok()
 }

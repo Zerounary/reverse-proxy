@@ -15,7 +15,8 @@ use futures_util::{future, pin_mut, SinkExt, StreamExt};
 use hyper::Client;
 use hyper::{client::HttpConnector, header, Body, StatusCode, Version};
 use hyper_tls::HttpsConnector;
-use std::{net::SocketAddr, path::PathBuf};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
+use tokio::sync::RwLock;
 use tokio_tungstenite::tungstenite::protocol::Message;
 use tokio_tungstenite::{
     connect_async,
@@ -25,7 +26,10 @@ use tokio_tungstenite::{
 use base64::encode;
 use sha1::{Digest, Sha1};
 
-use crate::{config::read_yaml_file, log::log_proxy};
+use crate::{
+    config::{read_yaml_file, spawn_hot_reload_task, SharedConfig},
+    log::log_proxy,
+};
 
 type HttpClient = hyper::client::Client<HttpConnector, Body>;
 type HttpsClient = Client<HttpsConnector<HttpConnector>>;
@@ -45,18 +49,20 @@ async fn main() {
     let args = Args::parse();
     let yaml_path = args.config.unwrap_or("./config.yml".to_string());
 
-    let config = read_yaml_file(&yaml_path);
+    let init_config = read_yaml_file(&yaml_path);
+    let shared_config: SharedConfig = Arc::new(RwLock::new(init_config.clone()));
+    spawn_hot_reload_task(PathBuf::from(&yaml_path), shared_config.clone());
 
     let httpclient = Client::new();
     let httpsclient = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
 
-    if let Some(enable_ssl) = config.ssl {
+    if let Some(enable_ssl) = init_config.ssl {
         if enable_ssl {
-            tokio::spawn(https_server(config.clone()));
+            tokio::spawn(https_server(init_config.clone(), shared_config.clone()));
         }
     }
 
-    let fn_config = config.clone();
+    let fn_config = shared_config.clone();
     let app = Router::new().layer(middleware::from_fn(move |req, next| {
         proxy_http_reqs(
             req,
@@ -66,9 +72,9 @@ async fn main() {
             fn_config.clone(),
         )
     }));
-    let addr = SocketAddr::from(([0, 0, 0, 0], config.port.unwrap_or(80)));
+    let addr = SocketAddr::from(([0, 0, 0, 0], init_config.port.unwrap_or(80)));
     println!("http reverse proxy listening on {}", addr);
-    for (domain, host) in &config.hosts {
+    for (domain, host) in &init_config.hosts {
         log_proxy(
             &format!("http://{}", &domain),
             &host.protocol,
@@ -82,11 +88,11 @@ async fn main() {
         .unwrap();
 }
 
-async fn https_server(config: Config) {
+async fn https_server(config: Config, shared_config: SharedConfig) {
     let httpclient = Client::new();
     let httpsclient = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
 
-    let fn_config = config.clone();
+    let fn_config = shared_config.clone();
     let app = Router::new().layer(middleware::from_fn(move |req, next| {
         proxy_https_reqs(
             req,
@@ -133,7 +139,7 @@ async fn proxy_https_reqs(
     _next: Next<Body>,
     httpclient: HttpClient,
     httpsclient: HttpsClient,
-    config: Config,
+    shared_config: SharedConfig,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let path = req.uri().path();
     let path_query = req
@@ -150,7 +156,10 @@ async fn proxy_https_reqs(
 
     if let Some(host) = host {
         let host = host.to_string();
-        let host_config = config.hosts.get(&host);
+        let host_config = {
+            let config = shared_config.read().await;
+            config.hosts.get(&host).cloned()
+        };
         match host_config {
             Some(cfg) => {
                 let uri = format!("{}://{}:{}{}", cfg.protocol, cfg.ip, cfg.port, path_query);
@@ -291,7 +300,7 @@ async fn proxy_http_reqs(
     _next: Next<Body>,
     httpclient: HttpClient,
     httpsclient: HttpsClient,
-    config: Config,
+    shared_config: SharedConfig,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let path = req.uri().path();
     let path_query = req
@@ -308,7 +317,10 @@ async fn proxy_http_reqs(
 
     if let Some(host) = host {
         let host = host.to_string();
-        let host_config = config.hosts.get(&host);
+        let host_config = {
+            let config = shared_config.read().await;
+            config.hosts.get(&host).cloned()
+        };
         match host_config {
             Some(cfg) => {
                 let uri = format!("{}://{}:{}{}", cfg.protocol, cfg.ip, cfg.port, path_query);
