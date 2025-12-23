@@ -1,8 +1,8 @@
 pub mod config;
 pub mod log;
 pub mod proxy;
+pub mod tls;
 
-use axum_server::tls_rustls::RustlsConfig;
 use clap::Parser;
 use config::Config;
 use std::{error::Error, net::SocketAddr, path::PathBuf, sync::Arc};
@@ -17,6 +17,7 @@ use crate::{
     },
     log::log_proxy,
     proxy::{build_http_router, build_https_router, create_http_client, create_https_client},
+    tls::build_rustls_config,
 };
 
 #[derive(clap::Parser)]
@@ -71,19 +72,9 @@ async fn run_https_server(config: Config, shared_config: SharedConfig) -> Result
     let app = build_https_router(httpclient, httpsclient, shared_config.clone());
     let addr = SocketAddr::from(([0, 0, 0, 0], config.resolved_ssl_port()));
 
-    let ssl_cfg = RustlsConfig::from_pem_file(
-        config.resolved_ssl_cert_path(),
-        config.resolved_ssl_key_path(),
-    )
-    .await
-    .map_err(|err| {
-        eprintln!(
-            "Failed to load TLS files (cert: {:?}, key: {:?}): {}",
-            config.resolved_ssl_cert_path(),
-            config.resolved_ssl_key_path(),
-            err
-        );
-        Box::new(err) as DynError
+    let ssl_cfg = build_rustls_config(&config).map_err(|err| {
+        eprintln!("Failed to construct TLS config: {}", err);
+        err
     })?;
 
     println!("https reverse proxy listening on {}", addr);

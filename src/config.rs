@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     sync::Arc,
@@ -31,6 +31,14 @@ pub struct Host {
     pub port: Port,
     #[validate(custom(function = "protocol_check"))]
     pub protocol: String,
+    #[serde(default)]
+    pub tls: Option<HostTls>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Validate)]
+pub struct HostTls {
+    pub cert_file: Option<String>,
+    pub key_file: Option<String>,
 }
 
 pub type SharedConfig = Arc<RwLock<Config>>;
@@ -118,39 +126,44 @@ pub fn spawn_tls_watch_task(
 ) {
     tokio::spawn(async move {
         let mut initialized = false;
-        let mut last_cert_path: Option<PathBuf> = None;
-        let mut last_cert_modified: Option<SystemTime> = None;
-        let mut last_key_path: Option<PathBuf> = None;
-        let mut last_key_modified: Option<SystemTime> = None;
+        let mut last_state: HashMap<PathBuf, Option<SystemTime>> = HashMap::new();
 
         loop {
             sleep(Duration::from_secs(1)).await;
 
-            let (cert_path, key_path) = {
+            let paths = {
                 let config_guard = shared_config.read().await;
-                (
-                    config_guard.resolved_ssl_cert_path(),
-                    config_guard.resolved_ssl_key_path(),
-                )
+                config_guard.collect_tls_file_paths()
             };
 
-            let cert_modified = file_modified_time(&cert_path).await;
-            let key_modified = file_modified_time(&key_path).await;
-
             let mut should_notify = false;
-            if initialized {
-                if last_cert_path.as_ref() != Some(&cert_path)
-                    || last_cert_modified != cert_modified
-                {
-                    should_notify = true;
-                }
+            let mut next_state: HashMap<PathBuf, Option<SystemTime>> = HashMap::new();
 
-                if last_key_path.as_ref() != Some(&key_path) || last_key_modified != key_modified {
+            for path in &paths {
+                let modified = file_modified_time(path).await;
+                if initialized {
+                    match last_state.get(path) {
+                        Some(previous) if *previous == modified => {}
+                        Some(_) => should_notify = true,
+                        None => should_notify = true,
+                    }
+                }
+                next_state.insert(path.clone(), modified);
+            }
+
+            if initialized {
+                let removed_paths = last_state
+                    .keys()
+                    .filter(|p| !next_state.contains_key(*p))
+                    .count();
+                if removed_paths > 0 {
                     should_notify = true;
                 }
             } else {
                 initialized = true;
             }
+
+            last_state = next_state;
 
             if should_notify
                 && tls_reload_tx
@@ -158,14 +171,7 @@ pub fn spawn_tls_watch_task(
                     .is_err()
             {
                 break;
-            } else if should_notify {
-                // already notified
             }
-
-            last_cert_path = Some(cert_path);
-            last_cert_modified = cert_modified;
-            last_key_path = Some(key_path);
-            last_key_modified = key_modified;
         }
     });
 }
@@ -201,5 +207,35 @@ impl Config {
 
     pub fn ssl_enabled(&self) -> bool {
         self.ssl.unwrap_or(false)
+    }
+
+    pub fn host_tls_entries(&self) -> Vec<(String, PathBuf, PathBuf)> {
+        self.hosts
+            .iter()
+            .filter_map(|(host_name, host)| {
+                let tls = host.tls.as_ref()?;
+                let cert = tls.cert_file.as_ref()?;
+                let key = tls.key_file.as_ref()?;
+                Some((
+                    host_name.to_ascii_lowercase(),
+                    PathBuf::from(cert),
+                    PathBuf::from(key),
+                ))
+            })
+            .collect()
+    }
+
+    pub fn collect_tls_file_paths(&self) -> Vec<PathBuf> {
+        let mut unique: HashSet<PathBuf> = HashSet::new();
+
+        unique.insert(self.resolved_ssl_cert_path());
+        unique.insert(self.resolved_ssl_key_path());
+
+        for (_, cert, key) in self.host_tls_entries() {
+            unique.insert(cert);
+            unique.insert(key);
+        }
+
+        unique.into_iter().collect()
     }
 }

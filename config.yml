@@ -1,8 +1,8 @@
 ssl: true
 ssl_port: 443
 # aliyun nginx
-ssl_key_file: './ssl/private.key.pem'
-ssl_cert_file: './ssl/domain.cert.pem'
+# ssl_key_file: './ssl/private.key.pem'
+# ssl_cert_file: './ssl/domain.cert.pem'
 # porkbun ssl
 # ssl_key_file: './ssl/private.key.pem'
 # ssl_cert_file: './ssl/domain.cert.pem'
@@ -11,3 +11,6 @@ hosts:
     port: 90
     ip: "127.0.0.1"
     protocol: "http"
+    tls:
+      cert_file: "./ssl/domain.cert.pem"
+      key_file: "./ssl/private.key.pem"

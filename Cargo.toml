@@ -36,3 +36,5 @@ pest_derive = "2.0"
 
 sha1 = "0.10.6"
 base64 = "0.22.1"
+rustls = "0.20"
+rustls-pemfile = "1.0"
