@@ -1,1 +1,3 @@
 /target
+domain.cert.pem
+private.key.pem
