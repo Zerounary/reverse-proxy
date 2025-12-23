@@ -6,7 +6,11 @@
 
 [ √ ] 根据配置文件，自动反向代理域名到目标地址
 
-[ √ ] 支持免费Https
+[ √ ] 支持 HTTP/HTTPS 热更新（配置或证书改动 1s 内自动生效）
+
+[ √ ] 支持共享 80/443 端口，按 Host/SNI 分发到不同后端
+
+[ √ ] 支持全局证书 + 每个 Host 独立证书（SNI）
 
 [ × ] 支持 DNS 接口，自动绑定域名IP
 
@@ -50,12 +54,13 @@ hosts:
 port: 80
 ssl: true
 ssl_port: 443
-ssl_key_file: './ssl/certificate.crt'
-ssl_cert_file: './ssl/private.pem'
+ssl_key_file: "./ssl/private.pem"
+ssl_cert_file: "./ssl/certificate.crt"
 hosts:
   "l.j-k.one":
     port: 81
     ip: "127.0.0.1"
+    protocol: "http"
 ```
 
 |字段| 必填 | 默认值 | 说明 |
@@ -70,6 +75,39 @@ hosts:
 使用 `*.j-k.one` 泛域名的形式申请证书
 
 下载证书后，将`certificate.crt`、`private.pem`复制到ssl目录下即可
+
+### 每个 Host 独立证书（SNI）
+
+如果你需要不同域名使用不同证书，可在 `hosts` 条目下注明 `tls` 字段，示例如下：
+
+```yaml
+ssl: true
+ssl_port: 443
+# 可选：全局兜底证书
+# ssl_key_file: "./ssl/default.key.pem"
+# ssl_cert_file: "./ssl/default.cert.pem"
+hosts:
+  "api.example.com":
+    port: 9000
+    ip: "127.0.0.1"
+    protocol: "http"
+    tls:
+      cert_file: "./ssl/api.cert.pem"
+      key_file: "./ssl/api.key.pem"
+  "admin.example.com":
+    port: 9100
+    ip: "127.0.0.1"
+    protocol: "http"
+    tls:
+      cert_file: "./ssl/admin.cert.pem"
+      key_file: "./ssl/admin.key.pem"
+```
+
+注意事项：
+
+1. `tls.cert_file` 与 `tls.key_file` 需成对出现，缺失则回退到全局证书。
+2. 所有证书/私钥改动、或 `config.yml` 更新，都由内置 watcher 检测并在 1 秒内触发热重启，无需手动重启服务。
+3. 如果未提供全局证书，程序会自动使用任意一个 Host 的证书作为兜底。
 
 ## 阿里云获取
 
