@@ -1,4 +1,4 @@
-use ansi_term::Colour::{Blue, Green, Red, White, Yellow};
+use ansi_term::Colour::Green;
 
 pub fn log_proxy(domain: &str, protocol: &str, ip: &str, port: &str) {
     println!(
